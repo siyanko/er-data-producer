@@ -12,6 +12,6 @@ trait ElasticSearch [F[_]]{
 
 object ElasticSearch {
   implicit val ioElasticSearch: ElasticSearch[IO] = new ElasticSearch[IO] {
-    override def send(data: Json): IO[Unit] = IO(println("Sending data to elastic search"))
+    override def send(data: Json): IO[Unit] = IO(println("Sending data to elastic search: " + data.toString()))
   }
 }

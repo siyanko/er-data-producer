@@ -1,5 +1,7 @@
 package er.data.producer
 
+import java.util.concurrent.Executors
+
 import cats.Applicative
 import cats.effect.{ExitCode, IO, IOApp}
 import er.data.producer.DataConverters.CommonEventData._
@@ -7,23 +9,28 @@ import er.data.producer.DataConverters._
 import er.data.producer.MuenchenDe._
 import io.circe.Encoder
 import io.circe.syntax._
+import cats.implicits._
+
+import scala.concurrent.ExecutionContext
 
 object MuenchenDeDataProducer extends IOApp {
 
-  implicit val convertF: MuenchenDeEventData => IO[CommonEventData] = muenchenDeToCommonEventData(Applicative[IO])
+  implicit val blockingEC = ExecutionContext.fromExecutorService(Executors.newCachedThreadPool())
+  implicit val convertF: MuenchenDeEventData => Option[CommonEventData] = muenchenDeToCommonEventData(Applicative[Option])
   implicit val logger: Logger[IO] = Logger.ioLogger(this.getClass)
 
   def program(implicit mde: MuenchenDe[IO],
               es: ElasticSearch[IO],
-              convertF: MuenchenDeEventData => IO[CommonEventData],
+              convertF: MuenchenDeEventData => Option[CommonEventData],
               logger: Logger[IO],
               encoder: Encoder[CommonEventData]): IO[Unit] = for {
     _ <- logger.logInfo("Producing data from muenche.de")
-    rawData <- mde.get("http://test.url")
-    _ <- logger.logInfo("Converting raw data")
-    commonData <- convertF(rawData)
+    muenchenDeEvents <- mde.get
     _ <- logger.logInfo("Sending data to elastic search")
-    _ <- es.send(commonData.asJson)
+    _ <- muenchenDeEvents
+      .map(convertF)
+      .flatten
+      .traverse[IO, Unit](data => es.send(data.asJson))
     _ <- logger.logInfo("Finished Job.")
   } yield ()
 

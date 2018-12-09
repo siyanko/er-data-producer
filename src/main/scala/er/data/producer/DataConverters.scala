@@ -10,7 +10,7 @@ import io.circe.{Encoder, Json}
 object DataConverters {
 
   def muenchenDeToCommonEventData[F[_] : Applicative]: MuenchenDeEventData => F[CommonEventData] = data =>
-    Applicative[F].pure(CommonEventData(data.eventName))
+    Applicative[F].pure(CommonEventData(data.etName))
 
   final case class CommonEventData(eventName: String)
 
