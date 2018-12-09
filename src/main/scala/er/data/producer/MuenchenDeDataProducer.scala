@@ -19,6 +19,7 @@ object MuenchenDeDataProducer extends IOApp {
   implicit val convertF: MuenchenDeEventData => Option[CommonEventData] = muenchenDeToCommonEventData
   implicit val logger: Logger[IO] = Logger.ioLogger(this.getClass)
   implicit val encoder = CommonEventData.commonEventDataEncoder
+  implicit val ioElasticSearch = ElasticSearch.ioElasticSearch
 
   def program(implicit mde: MuenchenDe[IO],
               es: ElasticSearch[IO],
