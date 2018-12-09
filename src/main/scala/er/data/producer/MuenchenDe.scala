@@ -37,16 +37,16 @@ object MuenchenDe {
       )
   }
 
-  final case class GeoLocation(latitude: String, longitude: String)
+  final case class MuenchenDeGeoLocation(latitude: String, longitude: String)
 
-  final case class Address(streetAddress: String, addressLocality: String, postalCode: String)
+  final case class MuenchenDeAddress(streetAddress: String, addressLocality: String, postalCode: String)
 
-  final case class Location(address: Option[Address], geo: Option[GeoLocation])
+  final case class Location(address: Option[MuenchenDeAddress], geo: Option[MuenchenDeGeoLocation])
 
   final case class MuenchenDeEventData(
                                         etName: String,
-                                        timestamp: Option[String],
-                                        endTimestamp: Option[String],
+                                        terminIso: Option[String],
+                                        endterminIso: Option[String],
                                         extUrl: Option[String],
                                         detailLogoUrl: Option[String],
                                         detailLink: Option[String],
@@ -55,7 +55,7 @@ object MuenchenDe {
 
   implicit val muenchenDeEventsEntityDecoder: EntityDecoder[IO, List[MuenchenDeEventData]] = jsonOf[IO, List[MuenchenDeEventData]]
   implicit val muenchenDeEventDataEntityDecoder: EntityDecoder[IO, MuenchenDeEventData] = jsonOf[IO, MuenchenDeEventData]
-  implicit val addressEntityDecoder: EntityDecoder[IO, Address] = jsonOf[IO, Address]
-  implicit val geoLocationEntityDecoder: EntityDecoder[IO, GeoLocation] = jsonOf[IO, GeoLocation]
+  implicit val addressEntityDecoder: EntityDecoder[IO, MuenchenDeAddress] = jsonOf[IO, MuenchenDeAddress]
+  implicit val geoLocationEntityDecoder: EntityDecoder[IO, MuenchenDeGeoLocation] = jsonOf[IO, MuenchenDeGeoLocation]
 
 }

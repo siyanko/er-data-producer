@@ -16,8 +16,9 @@ import scala.concurrent.ExecutionContext
 object MuenchenDeDataProducer extends IOApp {
 
   implicit val blockingEC = ExecutionContext.fromExecutorService(Executors.newCachedThreadPool())
-  implicit val convertF: MuenchenDeEventData => Option[CommonEventData] = muenchenDeToCommonEventData(Applicative[Option])
+  implicit val convertF: MuenchenDeEventData => Option[CommonEventData] = muenchenDeToCommonEventData
   implicit val logger: Logger[IO] = Logger.ioLogger(this.getClass)
+  implicit val encoder = CommonEventData.commonEventDataEncoder
 
   def program(implicit mde: MuenchenDe[IO],
               es: ElasticSearch[IO],
