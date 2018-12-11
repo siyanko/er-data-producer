@@ -2,14 +2,12 @@ package er.data.producer
 
 import java.util.concurrent.Executors
 
-import cats.Applicative
 import cats.effect.{ExitCode, IO, IOApp}
-import er.data.producer.DataConverters.CommonEventData._
+import cats.implicits._
 import er.data.producer.DataConverters._
 import er.data.producer.MuenchenDe._
 import io.circe.Encoder
 import io.circe.syntax._
-import cats.implicits._
 
 import scala.concurrent.ExecutionContext
 
