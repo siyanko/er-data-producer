@@ -15,7 +15,7 @@ object EventbriteDataProducer extends IOApp {
   val logger: Logger[IO] = Logger.ioLogger(this.getClass)
 
   def program: IO[Unit] = for {
-    resp <- ioEventBrite.getMunichEvents
+    resp <- ioEventBrite.getMunichEvents("XXX")
     _ <- logger.logInfo(s"RESP: $resp")
   } yield ()
 
