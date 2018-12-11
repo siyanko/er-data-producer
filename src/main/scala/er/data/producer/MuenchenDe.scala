@@ -12,7 +12,7 @@ import scala.concurrent.ExecutionContext
   Interaction with muenchen.de website.
  */
 trait MuenchenDe[F[_]] {
-  def get: F[List[MuenchenDeEventData]]
+  def get(id: Int): F[List[MuenchenDeEventData]]
 }
 
 object MuenchenDe {
@@ -21,19 +21,19 @@ object MuenchenDe {
                             ceff: ConcurrentEffect[IO]
                            ): MuenchenDe[IO] = new MuenchenDe[IO] {
 
-    val mkRequest: Request[IO] = Request[IO]()
+    val mkRequest: Int => Request[IO] = id => Request[IO]()
       .withUri(Uri.uri("https://www.muenchen.de/opendi/ajax.html"))
       .withMethod(Method.POST)
       .withEntity(UrlForm(
         "opComposite" -> "ajax",
         "action" -> "getEventListElements",
-        "value" -> "cs---0"
+        "value" -> s"cs---$id"
       ))
 
 
-    override def get: IO[List[MuenchenDeEventData]] =
+    override def get(id: Int): IO[List[MuenchenDeEventData]] =
       BlazeClientBuilder[IO](ec).resource.use(
-        _.expect[List[MuenchenDeEventData]](mkRequest)
+        _.expect[List[MuenchenDeEventData]](mkRequest(id))
       )
   }
 

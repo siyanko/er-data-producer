@@ -27,7 +27,7 @@ object MuenchenDeDataProducer extends IOApp {
               logger: Logger[IO],
               encoder: Encoder[CommonEventData]): IO[Unit] = for {
     _ <- logger.logInfo("Producing data from muenche.de")
-    muenchenDeEvents <- mde.get
+    muenchenDeEvents <- mde.get(100)
     _ <- logger.logInfo("Sending data to elastic search")
     _ <- muenchenDeEvents
       .map(convertF)
