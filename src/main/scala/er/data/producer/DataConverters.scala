@@ -4,9 +4,9 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
 import er.data.producer.MuenchenDe._
+import er.data.producer.eventbrite.EventbriteService.EventbriteEvent
 import io.circe.{Encoder, Json}
 import io.circe.syntax._
-
 
 import scala.util.Try
 
@@ -16,12 +16,17 @@ import scala.util.Try
 object DataConverters {
 
 
-  val toLocalDateTime: String => Option[LocalDateTime] = timeStamp =>
-    Try(DateTimeFormatter.ISO_DATE_TIME.parse(timeStamp)).map(LocalDateTime.from).toOption
+  val toFormattedDateTime: DateTimeFormatter => String => Option[LocalDateTime] = format => timeStamp =>
+    Try(format.parse(timeStamp)).map(LocalDateTime.from).toOption
+
+  val toIsoDateTime: String => Option[LocalDateTime] = toFormattedDateTime(DateTimeFormatter.ISO_DATE_TIME)
+
+  val toLocalDateTime: String => Option[LocalDateTime] = toFormattedDateTime(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
 
   val toAddress: MuenchenDeAddress => Address = origin => Address(origin.streetAddress, origin.postalCode, origin.addressLocality)
 
   val toDouble: String => Option[Double] = s => Try(s.toDouble).toOption
+
   val toGeoLocation: MuenchenDeGeoLocation => Option[GeoLocation] = origin => for {
     lat <- toDouble(origin.latitude)
     lon <- toDouble(origin.longitude)
@@ -30,17 +35,41 @@ object DataConverters {
 
   val muenchenDeToCommonEventData: MuenchenDeEventData => Option[CommonEventData] = data => for {
     beginDateTimeStr <- data.terminIso
-    beginDateTime <- toLocalDateTime(beginDateTimeStr + ":00")
+    beginDateTime <- toIsoDateTime(beginDateTimeStr + ":00")
     originUrl <- data.detailLink
   } yield CommonEventData(
     data.etName,
     beginDateTime,
-    data.endterminIso.flatMap(d => toLocalDateTime(d + ":00")),
+    data.endterminIso.flatMap(d => toIsoDateTime(d + ":00")),
     data.extUrl,
     data.detailLogoUrl,
     originUrl,
     data.location.flatMap(_.address).map(toAddress),
     data.location.flatMap(_.geo).flatMap(toGeoLocation),
+    "DE",
+    "Munich"
+  )
+
+  val eventbriteEventToCommonEventData: EventbriteEvent => Option[CommonEventData] = data => for {
+    beginDateTime <- toLocalDateTime(data.beginDateTimeUtc)
+
+  } yield CommonEventData(
+    data.name,
+    beginDateTime,
+    data.endDateTimeUtc.flatMap(toLocalDateTime),
+    Some(data.url + "#tickets"),
+    Some(data.logoUrl),
+    data.url,
+    data.venue.map(_.address).flatMap(address => for {
+      street <- address.street
+      zip <- address.postalCode
+      locality <- address.locality
+    }yield Address(street, zip, locality)),
+    data.venue.flatMap(v => for {
+      lat <- toDouble(v.latitude)
+      lon <- toDouble(v.longitude)
+    } yield GeoLocation(lat, lon)
+    ),
     "DE",
     "Munich"
   )

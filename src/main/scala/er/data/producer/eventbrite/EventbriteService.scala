@@ -14,6 +14,8 @@ import Pagination._
 import EventbriteEvent._
 import EventbriteOrganizer._
 import EventbriteVenue._
+import cats.kernel.Semigroup
+import cats.implicits._
 
 import scala.concurrent.ExecutionContext
 
@@ -44,17 +46,27 @@ object EventbriteService {
       )
   }
 
-  final case class EventbriteVenue(name: String,
-                                   latitude: String,
-                                   longitude: String,
-                                   address: String)
+  final case class EventbriteAddress(postalCode: Option[String], street: Option[String], locality: Option[String])
+  object EventbriteAddress{
+    implicit val eventbriteAddressDecoder: Decoder[EventbriteAddress] = new Decoder[EventbriteAddress] {
+      override def apply(c: HCursor): Result[EventbriteAddress] = for {
+        postalCode <- c.downField("postal_code").as[Option[String]]
+        address1 <- c.downField("address_1").as[Option[String]]
+        address2 <- c.downField("address_2").as[Option[String]]
+        locality <- c.downField("city").as[Option[String]]
+      }yield EventbriteAddress(postalCode, Semigroup[Option[String]].combine(address1, address2), locality)
+    }
+  }
+
+  final case class EventbriteVenue(name: String, latitude: String, longitude: String, address: EventbriteAddress)
+
   object EventbriteVenue {
     implicit val eventbriteVenueDecoder: Decoder[EventbriteVenue] = new Decoder[EventbriteVenue] {
       override def apply(c: HCursor): Result[EventbriteVenue] = for {
         name <- c.downField("name").as[String]
         latitude <- c.downField("latitude").as[String]
         longitude <- c.downField("longitude").as[String]
-        address <- c.downField("address").downField("localized_address_display").as[String]
+        address <- c.downField("address").as[EventbriteAddress]
       } yield EventbriteVenue(name, latitude, longitude, address)
     }
   }
@@ -92,8 +104,8 @@ object EventbriteService {
         name <- c.downField("name").downField("text").as[String]
         description <- c.downField("description").downField("text").as[Option[String]]
         url <- c.downField("url").as[String]
-        beginDateTimeUtc <- c.downField("start").downField("utc").as[String]
-        endDateTimeUtc <- c.downField("end").downField("utc").as[Option[String]]
+        beginDateTimeUtc <- c.downField("start").downField("local").as[String]
+        endDateTimeUtc <- c.downField("end").downField("local").as[Option[String]]
         status <- c.downField("status").as[String]
         onlineEvent <- c.downField("online_event").as[Boolean]
         isSeries <- c.downField("is_series").as[Boolean]

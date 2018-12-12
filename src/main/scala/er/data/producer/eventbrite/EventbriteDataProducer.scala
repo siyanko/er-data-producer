@@ -6,6 +6,7 @@ import cats.effect.{ExitCode, IO, IOApp}
 import er.data.producer.Logger
 import er.data.producer.eventbrite.EventbriteService._
 import cats.implicits._
+import er.data.producer.DataConverters._
 
 import scala.concurrent.ExecutionContext
 import scala.io.StdIn
@@ -25,7 +26,7 @@ object EventbriteDataProducer extends IOApp {
     token <- readInput
     resp <- ioEventBrite.getMunichEvents(token)
     _ <- resp match {
-      case SuccessEbResponse(ls, pagination) => ls.traverse[IO, Unit](ev => logger.logInfo(ev.name))
+      case SuccessEbResponse(ls, pagination) => ls.map(eventbriteEventToCommonEventData).flatten.traverse[IO, Unit](ed => logger.logInfo(ed.toString))
       case FailedEbResponse(status, details) => logger.logError(s"Eventbrite error. Status: $status. Details: $details")
       case ParsingResponseFailure(failure) => logger.logError(failure.getMessage(), failure)
     }
