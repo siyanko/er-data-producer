@@ -3,10 +3,11 @@ package er.data.producer.eventbrite
 import java.util.concurrent.Executors
 
 import cats.effect.{ExitCode, IO, IOApp}
+import er.data.producer.DataConverters._
 import er.data.producer.Logger
 import er.data.producer.eventbrite.EventbriteService._
-import cats.implicits._
-import er.data.producer.DataConverters._
+import fs2.concurrent.Queue
+import io.circe.syntax._
 
 import scala.concurrent.ExecutionContext
 import scala.io.StdIn
@@ -14,9 +15,10 @@ import scala.io.StdIn
 object EventbriteDataProducer extends IOApp {
 
   implicit val blockingEC = ExecutionContext.fromExecutorService(Executors.newCachedThreadPool())
+  implicit val encoder = CommonEventData.commonEventDataEncoder
 
   val ioEventBrite = EventbriteService.ioEventbriteService
-  val logger: Logger[IO] = Logger.ioLogger(this.getClass)
+  implicit val logger: Logger[IO] = Logger.ioLogger(this.getClass)
 
   val readInput: IO[String] = IO(StdIn.readLine())
   val printStr: String => IO[Unit] = s => IO(println(s))
@@ -24,12 +26,14 @@ object EventbriteDataProducer extends IOApp {
   def program: IO[Unit] = for {
     _ <- printStr("Enter eventbrite access token")
     token <- readInput
-    resp <- ioEventBrite.getMunichEvents(token)
-    _ <- resp match {
-      case SuccessEbResponse(ls, pagination) => ls.map(eventbriteEventToCommonEventData).flatten.traverse[IO, Unit](ed => logger.logInfo(ed.toString))
-      case FailedEbResponse(status, details) => logger.logError(s"Eventbrite error. Status: $status. Details: $details")
-      case ParsingResponseFailure(failure) => logger.logError(failure.getMessage(), failure)
-    }
+    q <- Queue.bounded[IO, EventbriteEvent](100)
+    buff = new EventbriteBuffering[IO](q, ioEventBrite.getMunichEvents(token))
+    _ <- buff.start
+    _ <- q.dequeue
+      .mapAsyncUnordered(4)(ev => IO(eventbriteEventToCommonEventData(ev)))
+      .unNone
+      .mapAsyncUnordered(4)(cd => logger.logInfo(cd.asJson.toString))
+      .compile.drain
   } yield ()
 
   override def run(args: List[String]): IO[ExitCode] = program.attempt.flatMap {
