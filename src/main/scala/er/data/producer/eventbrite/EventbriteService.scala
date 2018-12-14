@@ -20,41 +20,49 @@ import cats.implicits._
 import scala.concurrent.ExecutionContext
 
 trait EventbriteService[F[_]] {
-  def getMunichEvents(token: String): F[EventbriteResponse]
+  def getMunichEvents(token: String): Int => F[EventbriteResponse]
 }
 
 object EventbriteService {
   def ioEventbriteService(implicit ec: ExecutionContext,
                           ceff: ConcurrentEffect[IO]): EventbriteService[IO] = new EventbriteService[IO] {
 
-    val mkRequest: String => Request[IO] = token => Request[IO]()
-      .withUri(Uri.uri("https://www.eventbriteapi.com/v3/events/search/?location.address=munich&expand=organizer,venue"))
+    val uri: String => Option[Uri] = s => Uri.fromString(s).toOption
+
+    val mkRequest: Uri => String => Request[IO] = uri => token => Request[IO]()
+      .withUri(uri)
       .withMethod(Method.GET)
       .withHeaders(
         Authorization(Credentials.Token(AuthScheme.Bearer, token)),
         Accept(MediaType.application.json)
       )
 
-    override def getMunichEvents(token: String): IO[EventbriteResponse] =
-      BlazeClientBuilder[IO](ec).resource.use[EventbriteResponse](
-        _.fetch[EventbriteResponse](mkRequest(token)) { resp =>
-          resp.status match {
-            case Ok => resp.attemptAs[SuccessEbResponse](jsonOf[IO, SuccessEbResponse]).valueOr(ParsingResponseFailure)
-            case status => resp.bodyAsText.compile.toList.map(_.mkString).map(s => FailedEbResponse(status, s))
-          }
-        }
-      )
+    override def getMunichEvents(token: String): Int => IO[EventbriteResponse] = page =>
+      uri(s"https://www.eventbriteapi.com/v3/events/search/?location.address=munich&expand=organizer,venue&page=$page") match {
+        case Some(uri) =>
+          BlazeClientBuilder[IO](ec).resource.use[EventbriteResponse](
+            _.fetch[EventbriteResponse](mkRequest(uri)(token)) { resp =>
+              resp.status match {
+                case Ok => resp.attemptAs[SuccessEbResponse](jsonOf[IO, SuccessEbResponse]).valueOr(ParsingResponseFailure)
+                case status => resp.bodyAsText.compile.toList.map(_.mkString).map(s => FailedEbResponse(status, s))
+              }
+            }
+          )
+
+        case None => IO(InvalidUrl)
+      }
   }
 
   final case class EventbriteAddress(postalCode: Option[String], street: Option[String], locality: Option[String])
-  object EventbriteAddress{
+
+  object EventbriteAddress {
     implicit val eventbriteAddressDecoder: Decoder[EventbriteAddress] = new Decoder[EventbriteAddress] {
       override def apply(c: HCursor): Result[EventbriteAddress] = for {
         postalCode <- c.downField("postal_code").as[Option[String]]
         address1 <- c.downField("address_1").as[Option[String]]
         address2 <- c.downField("address_2").as[Option[String]]
         locality <- c.downField("city").as[Option[String]]
-      }yield EventbriteAddress(postalCode, Semigroup[Option[String]].combine(address1, address2), locality)
+      } yield EventbriteAddress(postalCode, Semigroup[Option[String]].combine(address1, address2), locality)
     }
   }
 
@@ -75,7 +83,8 @@ object EventbriteService {
                                        description: Option[String],
                                        logoUrl: Option[String],
                                        url: Option[String])
-  object EventbriteOrganizer{
+
+  object EventbriteOrganizer {
     implicit val eventbriteOrganizerDecoder: Decoder[EventbriteOrganizer] = new Decoder[EventbriteOrganizer] {
       override def apply(c: HCursor): Result[EventbriteOrganizer] = for {
         name <- c.downField("name").as[Option[String]]
@@ -98,6 +107,7 @@ object EventbriteService {
                                    logoUrl: String,
                                    organizer: Option[EventbriteOrganizer],
                                    venue: Option[EventbriteVenue])
+
   object EventbriteEvent {
     implicit val eventbriteEventDecoder: Decoder[EventbriteEvent] = new Decoder[EventbriteEvent] {
       override def apply(c: HCursor): Result[EventbriteEvent] = for {
@@ -135,8 +145,9 @@ object EventbriteService {
                               pageSize: Int,
                               pageCount: Option[Int],
                               moreItems: Boolean)
+
   object Pagination {
-    implicit val paginationDecoder: Decoder[Pagination] = new Decoder[Pagination]{
+    implicit val paginationDecoder: Decoder[Pagination] = new Decoder[Pagination] {
       override def apply(c: HCursor): Result[Pagination] = for {
         objectCount <- c.downField("object_count").as[Option[Int]]
         pageNumber <- c.downField("page_number").as[Int]
@@ -150,7 +161,8 @@ object EventbriteService {
   trait EventbriteResponse
 
   final case class SuccessEbResponse(events: List[EventbriteEvent], pagination: Pagination) extends EventbriteResponse
-  object SuccessEbResponse{
+
+  object SuccessEbResponse {
     implicit val successEbResponseDecoder: Decoder[SuccessEbResponse] = new Decoder[SuccessEbResponse] {
       override def apply(c: HCursor): Result[SuccessEbResponse] = for {
         pagination <- c.downField("pagination").as[Pagination]
@@ -158,7 +170,11 @@ object EventbriteService {
       } yield SuccessEbResponse(events, pagination)
     }
   }
+
   final case class ParsingResponseFailure(failure: DecodeFailure) extends EventbriteResponse
+
   final case class FailedEbResponse(status: Status, details: String) extends EventbriteResponse
+
+  final case object InvalidUrl extends EventbriteResponse
 
 }

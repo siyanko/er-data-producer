@@ -6,7 +6,7 @@ import er.data.producer.eventbrite.EventbriteService._
 import fs2.Stream
 import fs2.concurrent.Queue
 
-class EventbriteBuffering[F[_]](q: Queue[F, EventbriteEvent], callF: F[EventbriteResponse])
+class EventbriteBuffering[F[_]](q: Queue[F, EventbriteEvent], callF: Int => F[EventbriteResponse])
                                (implicit L: Logger[F], C: ConcurrentEffect[F]) {
 
   def start: Stream[F, Unit] = {
@@ -17,10 +17,11 @@ class EventbriteBuffering[F[_]](q: Queue[F, EventbriteEvent], callF: F[Eventbrit
           .mapAsyncUnordered(4)(q.enqueue1)
       case FailedEbResponse(status, details) => Stream.eval(L.logError(s"Eventbrite error. Status: $status. Details: $details"))
       case ParsingResponseFailure(failure) => Stream.eval(L.logError(failure.getMessage(), failure))
+      case InvalidUrl => Stream.eval(L.logError("Invalid request url."))
     }
 
     val init: Stream[F, Unit] = for {
-      resp <- Stream.eval(callF)
+      resp <- Stream.eval(callF(1))
       _ <- loop(resp)
     } yield ()
 
