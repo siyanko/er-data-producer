@@ -3,10 +3,10 @@ package er.data.producer
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
-import er.data.producer.MuenchenDe._
 import er.data.producer.eventbrite.EventbriteService.EventbriteEvent
-import io.circe.{Encoder, Json}
+import er.data.producer.muenchende.MuenchenDe.{MuenchenDeAddress, MuenchenDeEventData, MuenchenDeGeoLocation}
 import io.circe.syntax._
+import io.circe.{Encoder, Json}
 
 import scala.util.Try
 

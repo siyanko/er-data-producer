@@ -1,11 +1,12 @@
-package er.data.producer
+package er.data.producer.muenchende
 
 import cats.effect.{ConcurrentEffect, IO}
-import er.data.producer.MuenchenDe._
-import org.http4s.client.blaze.BlazeClientBuilder
-import org.http4s.{EntityDecoder, Method, Request, Uri, UrlForm}
+import er.data.producer.muenchende.MuenchenDe.MuenchenDeEventData
 import io.circe.generic.auto._
 import org.http4s.circe._
+import org.http4s.client.blaze.BlazeClientBuilder
+import org.http4s.{EntityDecoder, Method, Request, Uri, UrlForm}
+
 import scala.concurrent.ExecutionContext
 
 /*

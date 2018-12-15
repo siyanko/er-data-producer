@@ -1,11 +1,12 @@
-package er.data.producer
+package er.data.producer.muenchende
 
 import java.util.concurrent.Executors
 
 import cats.effect.{ExitCode, IO, IOApp}
 import cats.implicits._
 import er.data.producer.DataConverters._
-import er.data.producer.MuenchenDe._
+import er.data.producer.muenchende.MuenchenDe.MuenchenDeEventData
+import er.data.producer.{ElasticSearch, Logger}
 import io.circe.Encoder
 import io.circe.syntax._
 
