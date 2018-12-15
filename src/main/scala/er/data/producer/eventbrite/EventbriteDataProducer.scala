@@ -4,11 +4,12 @@ import java.util.concurrent.Executors
 
 import cats.effect.{ExitCode, IO, IOApp}
 import er.data.producer.DataConverters._
-import er.data.producer.Logger
+import er.data.producer.{ElasticSearch, Logger}
 import er.data.producer.eventbrite.EventbriteService._
 import fs2.concurrent.Queue
 import io.circe.syntax._
 import fs2.Stream
+
 import scala.concurrent.ExecutionContext
 import scala.io.StdIn
 
@@ -19,6 +20,8 @@ object EventbriteDataProducer extends IOApp {
 
   val ioEventBrite = EventbriteService.ioEventbriteService
   implicit val logger: Logger[IO] = Logger.ioLogger(this.getClass)
+  implicit val ioElasticSearch = ElasticSearch.ioElasticSearch
+
 
   val readInput: IO[String] = IO(StdIn.readLine())
   val printStr: String => IO[Unit] = s => IO(println(s))
@@ -33,7 +36,7 @@ object EventbriteDataProducer extends IOApp {
       q.dequeue
         .mapAsyncUnordered(4)(ev => IO(eventbriteEventToCommonEventData(ev)))
         .unNone
-        .mapAsyncUnordered(4)(cd => logger.logInfo(cd.asJson.toString))
+        .mapAsyncUnordered(4)(cd => ioElasticSearch.send(cd.asJson))
     ).parJoin(2)
   } yield ()
 
