@@ -66,15 +66,18 @@ object EventbriteService {
     }
   }
 
-  final case class EventbriteVenue(name: String, latitude: String, longitude: String, address: EventbriteAddress)
+  final case class EventbriteVenue(name: Option[String],
+                                   latitude: Option[String],
+                                   longitude: Option[String],
+                                   address: Option[EventbriteAddress])
 
   object EventbriteVenue {
     implicit val eventbriteVenueDecoder: Decoder[EventbriteVenue] = new Decoder[EventbriteVenue] {
       override def apply(c: HCursor): Result[EventbriteVenue] = for {
-        name <- c.downField("name").as[String]
-        latitude <- c.downField("latitude").as[String]
-        longitude <- c.downField("longitude").as[String]
-        address <- c.downField("address").as[EventbriteAddress]
+        name <- c.downField("name").as[Option[String]]
+        latitude <- c.downField("latitude").as[Option[String]]
+        longitude <- c.downField("longitude").as[Option[String]]
+        address <- c.downField("address").as[Option[EventbriteAddress]]
       } yield EventbriteVenue(name, latitude, longitude, address)
     }
   }
@@ -104,7 +107,7 @@ object EventbriteService {
                                    onlineEvent: Boolean,
                                    isSeries: Boolean,
                                    free: Boolean,
-                                   logoUrl: String,
+                                   logoUrl: Option[String],
                                    organizer: Option[EventbriteOrganizer],
                                    venue: Option[EventbriteVenue])
 
@@ -120,7 +123,7 @@ object EventbriteService {
         onlineEvent <- c.downField("online_event").as[Boolean]
         isSeries <- c.downField("is_series").as[Boolean]
         free <- c.downField("is_free").as[Boolean]
-        logoUrl <- c.downField("logo").downField("original").downField("url").as[String]
+        logoUrl <- c.downField("logo").right.downField("original").right.downField("url").as[Option[String]]
         organizer <- c.downField("organizer").as[Option[EventbriteOrganizer]]
         venue <- c.downField("venue").as[Option[EventbriteVenue]]
       } yield EventbriteEvent(

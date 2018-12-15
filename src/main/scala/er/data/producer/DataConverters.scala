@@ -58,19 +58,25 @@ object DataConverters {
     beginDateTime,
     data.endDateTimeUtc.flatMap(toLocalDateTime),
     Some(data.url + "#tickets"),
-    Some(data.logoUrl),
+    data.logoUrl,
     data.url,
-    data.venue.map(_.address).flatMap(address => for {
+    for {
+      venue <- data.venue
+      address <- venue.address
       street <- address.street
       zip <- address.postalCode
       locality <- address.locality
-    }yield Address(street, zip, locality)),
-    data.venue.flatMap(v => for {
-      lat <- toDouble(v.latitude)
-      lon <- toDouble(v.longitude)
+    } yield Address(street, zip, locality),
+    for {
+      venue <- data.venue
+      latStr <- venue.latitude
+      lat <- toDouble(latStr)
+      lonStr <- venue.longitude
+      lon <- toDouble(lonStr)
     } yield GeoLocation(lat, lon)
-    ),
-    "DE",
+    ,
+    "DE"
+    ,
     "Munich"
   )
 
