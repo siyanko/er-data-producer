@@ -15,15 +15,19 @@ class EventbriteBuffering[F[_]](q: Queue[F, EventbriteEvent], callF: Int => F[Ev
 
   def start: Stream[F, Unit] = {
 
+    def processPage(page: Int): F[EventbriteResponse] = for {
+      _ <- L.logInfo(s"Calling page: $page")
+      resp <- callF(page)
+    } yield resp
+
     def loop(resp: EventbriteResponse): F[Unit] = resp match {
       case SuccessEbResponse(ls, pagination) => for {
         _ <- Stream.emits(ls).covary[F]
           .mapAsyncUnordered(4)(q.enqueue1)
-            .compile.drain
+          .compile.drain
         _ <- if (pagination.moreItems) for {
           _ <- T.sleep(1.second)
-          _ <- L.logInfo(s"Calling next page: ${pagination.pageNumber + 1}")
-          resp <- callF(pagination.pageNumber + 1)
+          resp <- processPage(pagination.pageNumber + 1)
           _ <- loop(resp)
         } yield ()
         else C.unit
@@ -34,8 +38,7 @@ class EventbriteBuffering[F[_]](q: Queue[F, EventbriteEvent], callF: Int => F[Ev
     }
 
     val init: F[Unit] = for {
-      _ <- L.logInfo("Calling 1st page.")
-      resp <- callF(1)
+      resp <- processPage(1)
       _ <- loop(resp)
     } yield ()
 
