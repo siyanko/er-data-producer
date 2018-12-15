@@ -3,11 +3,12 @@ package er.data.producer.muenchende
 import java.util.concurrent.Executors
 
 import cats.effect.{ExitCode, IO, IOApp}
-import cats.implicits._
 import er.data.producer.DataConverters._
+import er.data.producer.eventbrite.EventbriteDataProducer.printStr
 import er.data.producer.muenchende.MuenchenDe.MuenchenDeEventData
 import er.data.producer.{ElasticSearch, Logger}
-import io.circe.Encoder
+import fs2.Stream
+import fs2.concurrent.Queue
 import io.circe.syntax._
 
 import scala.concurrent.ExecutionContext
@@ -20,23 +21,22 @@ object MuenchenDeDataProducer extends IOApp {
   implicit val encoder = CommonEventData.commonEventDataEncoder
   implicit val ioElasticSearch = ElasticSearch.ioElasticSearch
 
-  def program(implicit mde: MuenchenDe[IO],
-              es: ElasticSearch[IO],
-              convertF: MuenchenDeEventData => Option[CommonEventData],
-              logger: Logger[IO],
-              encoder: Encoder[CommonEventData]): IO[Unit] = for {
-    _ <- logger.logInfo("Producing data from muenche.de")
-    muenchenDeEvents <- mde.get(100)
-    _ <- logger.logInfo("Sending data to elastic search")
-    _ <- muenchenDeEvents
-      .map(convertF)
-      .flatten
-      .traverse[IO, Unit](data => es.send(data.asJson))
-    _ <- logger.logInfo("Finished Job.")
+  def program: Stream[IO, Unit] = for {
+    _ <- Stream.eval(printStr("Producing data from muenche.de"))
+    q <- Stream.eval(Queue.bounded[IO, MuenchenDeEventData](100))
+    buff = new MuenchenDeBuffering[IO](q, MuenchenDe.ioMuenchenDe.get, 71)
+    _ <- Stream(
+      buff.start,
+      q.dequeue
+        .mapAsyncUnordered(4)(ev => IO(convertF(ev)))
+        .unNone
+        .mapAsyncUnordered(4)(cd => ioElasticSearch.send(cd.asJson))
+    ).parJoin(2)
   } yield ()
 
-  override def run(args: List[String]): IO[ExitCode] = program.attempt.flatMap {
-    case Left(err) => Logger[IO].logError(err.getMessage, err).map(_ => ExitCode.Error)
-    case Right(_) => IO(ExitCode.Success)
+  override def run(args: List[String]): IO[ExitCode] = program.compile.drain.attempt.flatMap {
+    case Left(err) => logger.logError(s"muenche.de producer error. ${err.getMessage}", err)
+      .map(_ => ExitCode.Error)
+    case Right(_) => logger.logInfo("Program finished successfully.").map(_ => ExitCode.Success)
   }
 }
