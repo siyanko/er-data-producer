@@ -24,5 +24,7 @@ libraryDependencies ++= Seq (
 
   "org.http4s" %% "http4s-dsl" % http4sVersion,
   "org.http4s" %% "http4s-blaze-client" % http4sVersion,
-  "org.http4s" %% "http4s-circe" % http4sVersion
+  "org.http4s" %% "http4s-circe" % http4sVersion,
+
+  "org.scalatest" %% "scalatest" % "3.0.5" % Test
 )
